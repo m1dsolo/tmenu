@@ -1,0 +1,16 @@
+[package]
+name = "tmenu"
+version = "0.1.0"
+edition = "2024"
+authors = ["m1dsolo <yx1053532442@gmail.com>"]
+description = "A simple TUI fuzzy finder"
+license = "MIT"
+repository = "https://github.com/m1dsolo/tmenu"
+readme = "README.md"
+keywords = ["tui", "terminal", "fuzzy-finder", "cli", "ratatui"]
+categories = ["command-line-utilities", "text-processing"]
+
+[dependencies]
+anyhow = "1.0"
+crossterm = "0.29"
+ratatui = "0.29"
