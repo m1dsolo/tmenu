@@ -11,11 +11,11 @@ use std::fs::File;
 
 pub struct App<'a> {
     running: bool,
-    input: String,
+    query: String,
+    result: Option<String>,
     all_options: Vec<&'a str>,
     filtered_options: Vec<&'a str>,
     list_state: ListState,
-    confirmed: bool,
 }
 
 impl<'a> App<'a> {
@@ -34,18 +34,18 @@ impl<'a> App<'a> {
 
         Self {
             running: true,
-            input: String::new(),
+            query: String::new(),
+            result: None,
             all_options: options_refs.clone(),
             filtered_options: options_refs,
             list_state,
-            confirmed: false,
         }
     }
 
     pub fn run(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<File>>,
-    ) -> Result<Option<&'a str>> {
+    ) -> Result<Option<String>> {
         while self.running {
             terminal.draw(|frame| self.draw(frame))?;
             if event::poll(std::time::Duration::from_millis(50))? {
@@ -55,15 +55,15 @@ impl<'a> App<'a> {
             }
         }
 
-        Ok(self.get_result())
+        Ok(self.result.take())
     }
 
     fn filter_options(&mut self) {
-        let input_lower = self.input.to_lowercase();
+        let query_lower = self.query.to_lowercase();
         self.filtered_options = self
             .all_options
             .iter()
-            .filter(|option| option.to_lowercase().contains(&input_lower))
+            .filter(|option| option.to_lowercase().contains(&query_lower))
             .copied()
             .collect();
 
@@ -80,22 +80,15 @@ impl<'a> App<'a> {
         self.list_state.select_previous();
     }
 
-    fn get_result(&mut self) -> Option<&'a str> {
-        self.confirmed
-            .then(|| self.list_state.selected())
-            .flatten()
-            .map(|index| self.filtered_options[index])
-    }
-
     pub fn draw(&mut self, frame: &mut Frame) {
         // layout
         let layout =
             Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).split(frame.area());
 
-        // input
-        let input = Paragraph::new(self.input.as_str())
+        // query
+        let query = Paragraph::new(self.query.as_str())
             .block(Block::default().title("Input").borders(Borders::ALL));
-        frame.render_widget(input, layout[0]);
+        frame.render_widget(query, layout[0]);
 
         // options
         let filtered_items: Vec<_> = self
@@ -114,7 +107,7 @@ impl<'a> App<'a> {
         frame.render_stateful_widget(list, layout[1], &mut self.list_state);
     }
 
-    // TODO: vim input
+    // TODO: vim keybindings
     fn handle_event(&mut self, event: KeyEvent) {
         if event.kind != KeyEventKind::Press {
             return;
@@ -123,11 +116,21 @@ impl<'a> App<'a> {
         match event.code {
             KeyCode::Esc => {
                 self.running = false;
-                self.confirmed = false;
+                self.result = None;
             }
             KeyCode::Enter => {
                 self.running = false;
-                self.confirmed = true;
+
+                if event.modifiers.contains(KeyModifiers::ALT) {
+                    self.result = Some(self.query.clone());
+                } else {
+                    self.result = self
+                        .list_state
+                        .selected()
+                        .and_then(|index| self.filtered_options.get(index))
+                        .map(|&option| option.to_string())
+                        .or_else(|| Some(self.query.clone()));
+                }
             }
             KeyCode::Char('j') if event.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.select_next()
@@ -138,12 +141,12 @@ impl<'a> App<'a> {
             KeyCode::Char(c) => {
                 // Handle typing
                 if c.is_ascii_graphic() || c == ' ' {
-                    self.input.push(c);
+                    self.query.push(c);
                     self.filter_options();
                 }
             }
             KeyCode::Backspace => {
-                self.input.pop();
+                self.query.pop();
                 self.filter_options();
             }
             _ => {} // Ignore other keys

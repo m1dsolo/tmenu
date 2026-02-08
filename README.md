@@ -42,6 +42,7 @@ Key bindings:
 - `Ctrl+j` to move down the list
 - `Ctrl+k` to move up the list
 - `Enter` to select an item
+- `Alt+Enter` to select the query
 - `Esc` to exit without selection
 
 ## Examples
