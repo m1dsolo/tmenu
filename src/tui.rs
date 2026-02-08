@@ -7,21 +7,23 @@ use ratatui::{
         terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     },
 };
-use std::io::{Stderr, stderr};
+use std::fs::File;
 
-/// Initializes the terminal for Ratatui on stderr.
-/// Enables raw mode and switches to the alternate screen buffer.
-pub fn init() -> Result<Terminal<CrosstermBackend<Stderr>>> {
+pub fn init() -> Result<Terminal<CrosstermBackend<File>>> {
     enable_raw_mode()?;
-    execute!(stderr(), EnterAlternateScreen)?;
-    let terminal = Terminal::new(CrosstermBackend::new(stderr()))?;
+
+    let mut tty = File::create("/dev/tty")?;
+    execute!(tty, EnterAlternateScreen)?;
+
+    let backend = CrosstermBackend::new(tty);
+    let terminal = Terminal::new(backend)?;
+
     Ok(terminal)
 }
 
-/// Restores the terminal to its original state.
-/// Disables raw mode and leaves the alternate screen buffer.
-pub fn restore() -> Result<()> {
+pub fn restore(terminal: &mut Terminal<CrosstermBackend<File>>) -> Result<()> {
+    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    execute!(stderr(), LeaveAlternateScreen)?;
+
     Ok(())
 }

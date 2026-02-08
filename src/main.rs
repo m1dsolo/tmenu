@@ -32,7 +32,7 @@ fn main() -> Result<()> {
     let mut app = App::new(&options);
     let res = app.run(&mut terminal);
 
-    tui::restore()?;
+    tui::restore(&mut terminal)?;
 
     // Handle the result of the application
     match res {

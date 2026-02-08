@@ -7,7 +7,7 @@ use ratatui::{
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
 };
-use std::io::Stderr;
+use std::fs::File;
 
 pub struct App<'a> {
     running: bool,
@@ -44,7 +44,7 @@ impl<'a> App<'a> {
 
     pub fn run(
         &mut self,
-        terminal: &mut Terminal<CrosstermBackend<Stderr>>,
+        terminal: &mut Terminal<CrosstermBackend<File>>,
     ) -> Result<Option<&'a str>> {
         while self.running {
             terminal.draw(|frame| self.draw(frame))?;
