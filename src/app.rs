@@ -15,6 +15,7 @@ pub struct App<'a> {
     all_options: Vec<&'a str>,
     filtered_options: Vec<&'a str>,
     list_state: ListState,
+    confirmed: bool,
 }
 
 impl<'a> App<'a> {
@@ -37,6 +38,7 @@ impl<'a> App<'a> {
             all_options: options_refs.clone(),
             filtered_options: options_refs,
             list_state,
+            confirmed: false,
         }
     }
 
@@ -53,7 +55,7 @@ impl<'a> App<'a> {
             }
         }
 
-        Ok(self.select_current())
+        Ok(self.get_result())
     }
 
     fn filter_options(&mut self) {
@@ -66,11 +68,8 @@ impl<'a> App<'a> {
             .collect();
 
         // After filtering, reset selection to the first item if there are results
-        if !self.filtered_options.is_empty() {
-            self.list_state.select(Some(0));
-        } else {
-            self.list_state.select(None);
-        }
+        self.list_state
+            .select(self.filtered_options.first().map(|_| 0));
     }
 
     fn select_next(&mut self) {
@@ -81,12 +80,11 @@ impl<'a> App<'a> {
         self.list_state.select_previous();
     }
 
-    fn select_current(&mut self) -> Option<&'a str> {
-        if let Some(selected_index) = self.list_state.selected() {
-            Some(self.filtered_options[selected_index])
-        } else {
-            None
-        }
+    fn get_result(&mut self) -> Option<&'a str> {
+        self.confirmed
+            .then(|| self.list_state.selected())
+            .flatten()
+            .map(|index| self.filtered_options[index])
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
@@ -123,8 +121,14 @@ impl<'a> App<'a> {
         }
 
         match event.code {
-            KeyCode::Esc => self.running = false,
-            KeyCode::Enter => self.running = false,
+            KeyCode::Esc => {
+                self.running = false;
+                self.confirmed = false;
+            }
+            KeyCode::Enter => {
+                self.running = false;
+                self.confirmed = true;
+            }
             KeyCode::Char('j') if event.modifiers.contains(KeyModifiers::CONTROL) => {
                 self.select_next()
             }
