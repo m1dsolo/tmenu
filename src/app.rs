@@ -113,12 +113,12 @@ impl<'a> App<'a> {
             return;
         }
 
-        match event.code {
-            KeyCode::Esc => {
+        match (event.modifiers, event.code) {
+            (_, KeyCode::Esc) => {
                 self.running = false;
                 self.result = None;
             }
-            KeyCode::Enter => {
+            (_, KeyCode::Enter) => {
                 self.running = false;
 
                 if event.modifiers.contains(KeyModifiers::ALT) {
@@ -132,20 +132,20 @@ impl<'a> App<'a> {
                         .or_else(|| Some(self.query.clone()));
                 }
             }
-            KeyCode::Char('j') if event.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.select_next()
-            }
-            KeyCode::Char('k') if event.modifiers.contains(KeyModifiers::CONTROL) => {
-                self.select_previous()
-            }
-            KeyCode::Char(c) => {
+            (_, KeyCode::Down)
+            | (_, KeyCode::Tab)
+            | (KeyModifiers::CONTROL, KeyCode::Char('j')) => self.select_next(),
+            (_, KeyCode::Up)
+            | (_, KeyCode::BackTab)
+            | (KeyModifiers::CONTROL, KeyCode::Char('k')) => self.select_previous(),
+            (_, KeyCode::Char(c)) => {
                 // Handle typing
                 if c.is_ascii_graphic() || c == ' ' {
                     self.query.push(c);
                     self.filter_options();
                 }
             }
-            KeyCode::Backspace => {
+            (_, KeyCode::Backspace) => {
                 self.query.pop();
                 self.filter_options();
             }
