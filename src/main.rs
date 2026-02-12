@@ -1,4 +1,5 @@
 mod app;
+mod filterer;
 mod tui;
 
 use anyhow::Result;

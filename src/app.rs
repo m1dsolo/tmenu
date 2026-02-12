@@ -1,3 +1,4 @@
+use crate::filterer::{ContainsFilterer, Filterer};
 use anyhow::Result;
 use ratatui::{
     Frame, Terminal,
@@ -13,32 +14,27 @@ pub struct App<'a> {
     running: bool,
     query: String,
     result: Option<String>,
-    all_options: Vec<&'a str>,
     filtered_options: Vec<&'a str>,
     list_state: ListState,
+    filterer: Box<dyn Filterer<'a> + 'a>,
 }
 
 impl<'a> App<'a> {
     pub fn new(options: &'a [String]) -> Self {
         assert!(!options.is_empty(), "Options cannot be empty");
 
-        let options_refs = options
+        let options = options
             .iter()
             .map(|option| option.as_str())
-            .collect::<Vec<_>>();
-
-        let mut list_state = ListState::default();
-        if !options_refs.is_empty() {
-            list_state.select(Some(0)); // Select the first item initially
-        }
+            .collect::<Vec<&'a str>>();
 
         Self {
             running: true,
             query: String::new(),
             result: None,
-            all_options: options_refs.clone(),
-            filtered_options: options_refs,
-            list_state,
+            filtered_options: options.clone(),
+            list_state: ListState::default(),
+            filterer: Box::new(ContainsFilterer::new(options)),
         }
     }
 
@@ -46,6 +42,9 @@ impl<'a> App<'a> {
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<File>>,
     ) -> Result<Option<String>> {
+        self.list_state
+            .select(self.filtered_options.first().map(|_| 0)); // Select the first item initially
+
         while self.running {
             terminal.draw(|frame| self.draw(frame))?;
             if event::poll(std::time::Duration::from_millis(50))? {
@@ -59,13 +58,7 @@ impl<'a> App<'a> {
     }
 
     fn filter_options(&mut self) {
-        let query_lower = self.query.to_lowercase();
-        self.filtered_options = self
-            .all_options
-            .iter()
-            .filter(|option| option.to_lowercase().contains(&query_lower))
-            .copied()
-            .collect();
+        self.filtered_options = self.filterer.filter(&self.query);
 
         // After filtering, reset selection to the first item if there are results
         self.list_state
