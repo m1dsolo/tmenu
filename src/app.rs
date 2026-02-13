@@ -1,12 +1,12 @@
 use crate::filterer::{ContainsFilterer, Filterer};
 use anyhow::Result;
 use ratatui::{
-    Frame, Terminal,
     backend::CrosstermBackend,
-    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, read},
+    crossterm::event::{self, read, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame, Terminal,
 };
 use std::fs::File;
 

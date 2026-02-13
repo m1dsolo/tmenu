@@ -1,11 +1,11 @@
 use anyhow::Result;
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
     crossterm::{
         execute,
-        terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     },
+    Terminal,
 };
 use std::fs::File;
 

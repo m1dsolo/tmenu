@@ -4,16 +4,22 @@ mod tui;
 
 use anyhow::Result;
 use app::App;
+use std::env;
 use std::io::{self, BufRead};
 
 fn main() -> Result<()> {
-    // Read options from stdin
-    let options: Vec<String> = io::stdin()
+    let args: Vec<String> = env::args().skip(1).collect();
+
+    let stdin_options: Vec<String> = io::stdin()
         .lock()
         .lines()
         .filter_map(|line| line.ok())
-        .filter(|line| !line.trim().is_empty()) // Filter out empty lines after trimming
+        .filter(|line| !line.trim().is_empty())
         .collect();
+
+    let mut options = args;
+    options.extend(stdin_options);
+
     if options.is_empty() {
         eprintln!("No options provided on stdin.");
         // Exit cleanly if no options are provided
