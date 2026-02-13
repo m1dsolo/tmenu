@@ -14,6 +14,7 @@ use std::fs::File;
 pub struct App<'a> {
     running: bool,
     query: String,
+    cursor_pos: usize,
     result: Option<String>,
     filtered_options: Vec<&'a str>,
     matched_indices: Vec<Vec<usize>>,
@@ -40,6 +41,7 @@ impl<'a> App<'a> {
         Self {
             running: true,
             query: String::new(),
+            cursor_pos: 0,
             result: None,
             filtered_options: options.clone(),
             matched_indices: vec![],
@@ -120,7 +122,7 @@ impl<'a> App<'a> {
             .borders(Borders::ALL)
             .inner(query_area);
 
-        let cursor_x = self.query.len() as u16;
+        let cursor_x = self.cursor_pos as u16;
         if cursor_x < inner_area.width {
             frame.set_cursor_position((inner_area.x + cursor_x, inner_area.y));
         }
@@ -178,6 +180,61 @@ impl<'a> App<'a> {
         frame.render_stateful_widget(list, layout[1], &mut self.list_state);
     }
 
+    fn move_cursor_left(&mut self) {
+        if self.cursor_pos > 0 {
+            self.cursor_pos -= 1;
+        }
+    }
+
+    fn move_cursor_right(&mut self) {
+        if self.cursor_pos < self.query.len() {
+            self.cursor_pos += 1;
+        }
+    }
+
+    fn move_cursor_to_start(&mut self) {
+        self.cursor_pos = 0;
+    }
+
+    fn move_cursor_to_end(&mut self) {
+        self.cursor_pos = self.query.len();
+    }
+
+    fn delete_char_before_cursor(&mut self) {
+        if self.cursor_pos > 0 {
+            self.query.remove(self.cursor_pos - 1);
+            self.cursor_pos -= 1;
+            self.filter_options();
+        }
+    }
+
+    fn delete_word_before_cursor(&mut self) {
+        if self.cursor_pos > 0 {
+            let mut pos = self.cursor_pos;
+            while pos > 0 && self.query.chars().nth(pos - 1) == Some(' ') {
+                pos -= 1;
+            }
+            while pos > 0 && self.query.chars().nth(pos - 1) != Some(' ') {
+                pos -= 1;
+            }
+            self.query.drain(pos..self.cursor_pos);
+            self.cursor_pos = pos;
+            self.filter_options();
+        }
+    }
+
+    fn clear_query(&mut self) {
+        self.query.clear();
+        self.cursor_pos = 0;
+        self.filter_options();
+    }
+
+    fn insert_char(&mut self, c: char) {
+        self.query.insert(self.cursor_pos, c);
+        self.cursor_pos += 1;
+        self.filter_options();
+    }
+
     // TODO: vim keybindings
     fn handle_event(&mut self, event: KeyEvent) {
         if event.kind != KeyEventKind::Press {
@@ -209,17 +266,23 @@ impl<'a> App<'a> {
             (_, KeyCode::Up)
             | (_, KeyCode::BackTab)
             | (KeyModifiers::CONTROL, KeyCode::Char('k')) => self.select_previous(),
+            (_, KeyCode::Left) => self.move_cursor_left(),
+            (_, KeyCode::Right) => self.move_cursor_right(),
+            (_, KeyCode::Home) | (KeyModifiers::CONTROL, KeyCode::Char('a')) => {
+                self.move_cursor_to_start()
+            }
+            (_, KeyCode::End) | (KeyModifiers::CONTROL, KeyCode::Char('e')) => {
+                self.move_cursor_to_end()
+            }
+            (_, KeyCode::Backspace) => self.delete_char_before_cursor(),
+            (KeyModifiers::CONTROL, KeyCode::Char('w')) => self.delete_word_before_cursor(),
+            (KeyModifiers::CONTROL, KeyCode::Char('u')) => self.clear_query(),
             (_, KeyCode::Char(c)) => {
                 if c.is_ascii_graphic() || c == ' ' {
-                    self.query.push(c);
-                    self.filter_options();
+                    self.insert_char(c);
                 }
             }
-            (_, KeyCode::Backspace) => {
-                self.query.pop();
-                self.filter_options();
-            }
-            _ => {} // Ignore other keys
+            _ => {}
         }
     }
 }
