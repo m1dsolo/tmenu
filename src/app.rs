@@ -1,10 +1,11 @@
-use crate::filterer::{ContainsFilterer, Filterer};
+use crate::filterer::{ContainsFilterer, Filterer, FuzzyFilterer};
 use anyhow::Result;
 use ratatui::{
     backend::CrosstermBackend,
     crossterm::event::{self, read, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
@@ -15,12 +16,14 @@ pub struct App<'a> {
     query: String,
     result: Option<String>,
     filtered_options: Vec<&'a str>,
+    matched_indices: Vec<Vec<usize>>,
     list_state: ListState,
-    filterer: Box<dyn Filterer<'a> + 'a>,
+    contains_filterer: ContainsFilterer<'a>,
+    fuzzy_filterer: Option<FuzzyFilterer<'a>>,
 }
 
 impl<'a> App<'a> {
-    pub fn new(options: &'a [String]) -> Self {
+    pub fn new(options: &'a [String], use_fuzzy: bool) -> Self {
         assert!(!options.is_empty(), "Options cannot be empty");
 
         let options = options
@@ -28,13 +31,21 @@ impl<'a> App<'a> {
             .map(|option| option.as_str())
             .collect::<Vec<&'a str>>();
 
+        let fuzzy_filterer = if use_fuzzy {
+            Some(FuzzyFilterer::new(options.clone()))
+        } else {
+            None
+        };
+
         Self {
             running: true,
             query: String::new(),
             result: None,
             filtered_options: options.clone(),
+            matched_indices: vec![],
             list_state: ListState::default(),
-            filterer: Box::new(ContainsFilterer::new(options)),
+            contains_filterer: ContainsFilterer::new(options),
+            fuzzy_filterer,
         }
     }
 
@@ -58,9 +69,35 @@ impl<'a> App<'a> {
     }
 
     fn filter_options(&mut self) {
-        self.filtered_options = self.filterer.filter(&self.query);
+        if let Some(ref fuzzy) = self.fuzzy_filterer {
+            let results = fuzzy.filter_with_matches(&self.query);
+            self.filtered_options = results.iter().map(|r| r.text).collect();
+            self.matched_indices = results.into_iter().map(|r| r.matched_indices).collect();
+        } else {
+            self.filtered_options = self.contains_filterer.filter(&self.query);
 
-        // After filtering, reset selection to the first item if there are results
+            if !self.query.is_empty() {
+                self.matched_indices = self
+                    .filtered_options
+                    .iter()
+                    .map(|option| {
+                        let mut indices = Vec::new();
+                        let mut search = *option;
+                        let query_lower = self.query.to_lowercase();
+                        while let Some(pos) = search.to_lowercase().find(&query_lower) {
+                            for i in pos..pos + self.query.len() {
+                                indices.push(option.len() - search.len() + i);
+                            }
+                            search = &search[pos + 1..];
+                        }
+                        indices
+                    })
+                    .collect();
+            } else {
+                self.matched_indices = vec![vec![]; self.filtered_options.len()];
+            }
+        }
+
         self.list_state
             .select(self.filtered_options.first().map(|_| 0));
     }
@@ -74,21 +111,51 @@ impl<'a> App<'a> {
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
-        // layout
         let layout =
             Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).split(frame.area());
 
-        // query
         let query = Paragraph::new(self.query.as_str())
             .block(Block::default().title("Input").borders(Borders::ALL));
         frame.render_widget(query, layout[0]);
 
-        // options
         let filtered_items: Vec<_> = self
             .filtered_options
             .iter()
-            .map(|&option| ListItem::new(option).style(Style::default().fg(Color::White)))
+            .enumerate()
+            .map(|(idx, &option)| {
+                if !self.query.is_empty() {
+                    let indices = self.matched_indices.get(idx).cloned().unwrap_or_default();
+                    if indices.is_empty() {
+                        ListItem::new(option).style(Style::default().fg(Color::White))
+                    } else {
+                        let chars: Vec<char> = option.chars().collect();
+                        let mut spans = Vec::new();
+                        let mut last_idx = 0;
+
+                        for &idx in &indices {
+                            if idx > last_idx {
+                                spans.push(Span::raw(
+                                    chars[last_idx..idx].iter().collect::<String>(),
+                                ));
+                            }
+                            spans.push(Span::raw(chars[idx].to_string()).style(
+                                Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+                            ));
+                            last_idx = idx + 1;
+                        }
+
+                        if last_idx < chars.len() {
+                            spans.push(Span::raw(chars[last_idx..].iter().collect::<String>()));
+                        }
+
+                        ListItem::new(Line::from(spans))
+                    }
+                } else {
+                    ListItem::new(option).style(Style::default().fg(Color::White))
+                }
+            })
             .collect();
+
         let list = List::new(filtered_items)
             .block(Block::default().title("Items").borders(Borders::ALL))
             .highlight_style(

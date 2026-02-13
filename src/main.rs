@@ -4,11 +4,27 @@ mod tui;
 
 use anyhow::Result;
 use app::App;
-use std::env;
+use clap::{Arg, Command};
 use std::io::{self, BufRead};
 
 fn main() -> Result<()> {
-    let args: Vec<String> = env::args().skip(1).collect();
+    let matches = Command::new("tmenu")
+        .arg(
+            Arg::new("fuzzy")
+                .short('f')
+                .long("fuzzy")
+                .help("Use fuzzy matching")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(Arg::new("options").num_args(0..))
+        .get_matches();
+
+    let use_fuzzy = matches.get_flag("fuzzy");
+
+    let args: Vec<String> = matches
+        .get_many::<String>("options")
+        .map(|vals| vals.cloned().collect())
+        .unwrap_or_default();
 
     let stdin_options: Vec<String> = io::stdin()
         .lock()
@@ -21,12 +37,10 @@ fn main() -> Result<()> {
     options.extend(stdin_options);
 
     if options.is_empty() {
-        eprintln!("No options provided on stdin.");
-        // Exit cleanly if no options are provided
+        eprintln!("No options provided.");
         return Ok(());
     }
 
-    // Initialize the terminal
     let mut terminal = match tui::init() {
         Ok(term) => term,
         Err(err) => {
@@ -35,13 +49,11 @@ fn main() -> Result<()> {
         }
     };
 
-    // Create and run the application
-    let mut app = App::new(&options);
+    let mut app = App::new(&options, use_fuzzy);
     let res = app.run(&mut terminal);
 
     tui::restore(&mut terminal)?;
 
-    // Handle the result of the application
     match res {
         Ok(option) => {
             if let Some(option) = option {
