@@ -54,7 +54,7 @@ impl<'a> App<'a> {
         terminal: &mut Terminal<CrosstermBackend<File>>,
     ) -> Result<Option<String>> {
         self.list_state
-            .select(self.filtered_options.first().map(|_| 0)); // Select the first item initially
+            .select(self.filtered_options.first().map(|_| 0));
 
         while self.running {
             terminal.draw(|frame| self.draw(frame))?;
@@ -114,9 +114,20 @@ impl<'a> App<'a> {
         let layout =
             Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).split(frame.area());
 
+        let query_area = layout[0];
+        let inner_area = Block::default()
+            .title("Input")
+            .borders(Borders::ALL)
+            .inner(query_area);
+
+        let cursor_x = self.query.len() as u16;
+        if cursor_x < inner_area.width {
+            frame.set_cursor_position((inner_area.x + cursor_x, inner_area.y));
+        }
+
         let query = Paragraph::new(self.query.as_str())
             .block(Block::default().title("Input").borders(Borders::ALL));
-        frame.render_widget(query, layout[0]);
+        frame.render_widget(query, query_area);
 
         let filtered_items: Vec<_> = self
             .filtered_options
@@ -199,7 +210,6 @@ impl<'a> App<'a> {
             | (_, KeyCode::BackTab)
             | (KeyModifiers::CONTROL, KeyCode::Char('k')) => self.select_previous(),
             (_, KeyCode::Char(c)) => {
-                // Handle typing
                 if c.is_ascii_graphic() || c == ' ' {
                     self.query.push(c);
                     self.filter_options();
