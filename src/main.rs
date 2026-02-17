@@ -5,7 +5,7 @@ mod tui;
 use anyhow::Result;
 use app::App;
 use clap::{Arg, Command};
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, IsTerminal};
 
 fn main() -> Result<()> {
     let matches = Command::new("tmenu")
@@ -26,20 +26,19 @@ fn main() -> Result<()> {
         .map(|vals| vals.cloned().collect())
         .unwrap_or_default();
 
-    let stdin_options: Vec<String> = io::stdin()
-        .lock()
-        .lines()
-        .filter_map(|line| line.ok())
-        .filter(|line| !line.trim().is_empty())
-        .collect();
+    let stdin_options: Vec<String> = if !io::stdin().is_terminal() {
+        io::stdin()
+            .lock()
+            .lines()
+            .filter_map(|line| line.ok())
+            .filter(|line| !line.trim().is_empty())
+            .collect()
+    } else {
+        vec![]
+    };
 
     let mut options = args;
     options.extend(stdin_options);
-
-    if options.is_empty() {
-        eprintln!("No options provided.");
-        return Ok(());
-    }
 
     let mut terminal = match tui::init() {
         Ok(term) => term,

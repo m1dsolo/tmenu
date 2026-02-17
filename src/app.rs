@@ -25,8 +25,6 @@ pub struct App<'a> {
 
 impl<'a> App<'a> {
     pub fn new(options: &'a [String], use_fuzzy: bool) -> Self {
-        assert!(!options.is_empty(), "Options cannot be empty");
-
         let options = options
             .iter()
             .map(|option| option.as_str())
