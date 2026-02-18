@@ -82,13 +82,15 @@ impl<'a> App<'a> {
                     .iter()
                     .map(|option| {
                         let mut indices = Vec::new();
-                        let mut search = *option;
                         let query_lower = self.query.to_lowercase();
-                        while let Some(pos) = search.to_lowercase().find(&query_lower) {
-                            for i in pos..pos + self.query.len() {
-                                indices.push(option.len() - search.len() + i);
+                        let option_lower = option.to_lowercase();
+                        let mut search_start = 0;
+
+                        for pc in query_lower.chars() {
+                            if let Some(pos) = option_lower[search_start..].find(pc) {
+                                indices.push(search_start + pos);
+                                search_start += pos + 1;
                             }
-                            search = &search[pos + 1..];
                         }
                         indices
                     })

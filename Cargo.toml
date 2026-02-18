@@ -1,6 +1,6 @@
 [package]
 name = "tmenu"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["m1dsolo <yx1053532442@gmail.com>"]
 description = "A simple TUI fuzzy finder"
@@ -14,4 +14,4 @@ categories = ["command-line-utilities", "text-processing"]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
 crossterm = "0.29"
-ratatui = "0.29"
+ratatui = "0.30"
